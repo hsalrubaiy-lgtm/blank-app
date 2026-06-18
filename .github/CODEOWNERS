@@ -1,1 +1,146 @@
-* @streamlit/community-cloud
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from datetime import datetime
+
+# إعدادات الصفحة الأساسية
+st.set_page_config(page_title="شركة دايموند لتجارة السيارات", page_icon="💎", layout="wide")
+
+# تخصيص التصميم بالألوان الفاخرة (الأسود والذهبي والأزرق الداكن)
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    h1, h2, h3 { color: #f39c12 !important; font-family: 'Cairo', sans-serif; text-align: right; }
+    .stButton>button { background-color: #f39c12; color: black; font-weight: bold; width: 100%; border-radius: 8px; }
+    .stButton>button:hover { background-color: #e67e22; color: white; }
+    div[data-testid="metric-container"] { background-color: #1f2937; border: 1px solid #374151; padding: 15px; border-radius: 10px; text-align: center; }
+    .rtl-text { text-align: right; direction: rtl; }
+    </style>
+""", unsafe_allow_html=True)
+
+# تهيئة قاعدة البيانات المحلية في المتصفح
+if 'diamond_ledger' not in st.session_state:
+    st.session_state.diamond_ledger = pd.DataFrame(columns=["التاريخ", "البيان / الوصف", "التصنيف الرئيسي", "نوع الحركة", "المبلغ (د.ع)"])
+
+if 'diamond_debts' not in st.session_state:
+    st.session_state.diamond_debts = pd.DataFrame(columns=["الزبون/المطلوب", "نوع الدين", "المبلغ الكلي (د.ع)", "المسدد (د.ع)", "المتبقي (د.ع)", "الحالة"])
+
+# عنوان النظام
+st.markdown('<h1 class="rtl-text">💎 شركة دايموند لتجارة السيارات</h1>', unsafe_allow_html=True)
+st.markdown('<p class="rtl-text">النظام الحسابي المطور لإدارة الأرباح، المصاريف، الرسوم البيانية، والديون والأقساط بالدينار العراقي</p>', unsafe_allow_html=True)
+st.markdown("---")
+
+# القوائم الجانبية (Tabs) لتنظيم النظام
+tab1, tab2, tab3, tab4 = st.tabs(["📊 الحسابات العامة", "📉 التحليلات والرسوم البيانية", "🤝 الديون والأقساط", "📋 التقارير والبيانات"])
+
+# --- التبويب الأول: الحسابات العامة ---
+with tab1:
+    st.markdown('<h3 class="rtl-text">💵 تسجيل حركة مالية جديدة</h3>', unsafe_allow_html=True)
+    
+    with st.form("diamond_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            main_cat = st.selectbox("التصنيف الرئيسي", ["أرباح (إيرادات)", "مصاريف ثابتة", "مصاريف متغيرة"], key="main_cat")
+            
+            # حل مشكلة نوع الحركة (تتغير الخيارات ديناميكياً بحسب التصنيف الرئيسي)
+            if main_cat == "أرباح (إيرادات)":
+                sub_cat = st.selectbox("نوع الحركة (الفرعي)", ["بيع سيارة", "عمولة/دلالية", "أرباح صيانة/تجهيز", "إيرادات أخرى"])
+            elif main_cat == "مصاريف ثابتة":
+                sub_cat = st.selectbox("نوع الحركة (الفرعي)", ["إيجار المعرض", "رواتب الموظفين", "مولدة/كهرباء", "إنترنت ومياه"])
+            else:
+                sub_cat = st.selectbox("نوع الحركة (الفرعي)", ["تجهيز/تعديل سيارات", "إعلانات وتمويل", "ضيافة ومصاريف يومية", "أخرى"])
+                
+        with col2:
+            date_val = st.date_input("التاريخ", datetime.now())
+            amount_val = st.number_input("المبلغ (د.ع)", min_value=0, step=250000)
+            desc_val = st.text_input("البيان / الوصف (مثال: أرباح تاهو 2022 أو تصليح سوناتا)")
+
+        submit_btn = st.form_submit_button("💾 حفظ الحركة المالية فوراً")
+        
+        if submit_btn and amount_val > 0:
+            new_row = pd.DataFrame([{
+                "التاريخ": date_val.strftime("%Y-%m-%d"),
+                "البيان / الوصف": desc_val,
+                "التصنيف الرئيسي": main_cat,
+                "نوع الحركة": sub_cat,
+                "المبلغ (د.ع)": amount_val
+            }])
+            st.session_state.diamond_ledger = pd.concat([st.session_state.diamond_ledger, new_row], ignore_index=True)
+            st.success("✅ تم تسجيل الحركة المالية بنجاح في النظام!")
+
+    # عرض الموقف المالي الحالي
+    st.markdown("---")
+    st.markdown('<h3 class="rtl-text">📊 الموقف المالي الحالي (الخلاصة)</h3>', unsafe_allow_html=True)
+    
+    df = st.session_state.diamond_ledger
+    total_revenue = df[df["التصنيف الرئيسي"] == "أرباح (إيرادات)"]["المبلغ (د.ع)"].sum()
+    total_expenses = df[df["التصنيف الرئيسي"].str.contains("مصاريف")]["المبلغ (د.ع)"].sum()
+    net_profit = total_revenue - total_expenses
+
+    m_col1, m_col2, m_col3 = st.columns(3)
+    with m_col1:
+        st.metric(label="💰 إجمالي الأرباح والواردات", value=f"{total_revenue:,.0f} د.ع")
+    with m_col2:
+        st.metric(label="📉 إجمالي كافة المصاريف", value=f"{total_expenses:,.0f} د.ع")
+    with m_col3:
+        color = "normal" if net_profit >= 0 else "inverse"
+        st.metric(label="🟩 صافي الأرباح الحقيقية", value=f"{net_profit:,.0f} د.ع", delta=f"{net_profit:,.0f} د.ع")
+
+# --- التبويب الثاني: التحليلات والرسوم البيانية ---
+with tab2:
+    st.markdown('<h3 class="rtl-text">📉 الرسوم البيانية والتحليل المالي</h3>', unsafe_allow_html=True)
+    if not st.session_state.diamond_ledger.empty:
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            fig1 = px.pie(st.session_state.diamond_ledger, values='المبلغ (د.ع)', names='التصنيف الرئيسي', 
+                          title="نسبة الأرباح مقارنة بالمصاريف", color_discrete_sequence=['#2ecc71', '#e74c3c', '#3498db'])
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col_g2:
+            fig2 = px.bar(st.session_state.diamond_ledger, x='نوع الحركة', y='المبلغ (د.ع)', color='التصنيف الرئيسي',
+                          title="توزيع المبالغ حسب نوع الحركة التفصيلي")
+            st.plotly_chart(fig2, use_container_width=True)
+    else:
+        st.info("💡 لا توجد بيانات كافية لعرض الرسوم البيانية. سجل بعض العمليات أولاً.")
+
+# --- التبويب الثالث: الديون والأقساط ---
+with tab3:
+    st.markdown('<h3 class="rtl-text">🤝 نظام إدارة الديون والأقساط للزبائن والمعرض</h3>', unsafe_allow_html=True)
+    
+    with st.form("debt_form", clear_on_submit=True):
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            debtor_name = st.text_input("اسم الزبون / الجهة")
+            debt_type = st.selectbox("نوع الدين", ["لنا (قسط أو دين على زبون)", "علينا (مطلوبين لمعرض أو شخص)"])
+        with col_d2:
+            total_debt = st.number_input("المبلغ الكلي للدين (د.ع)", min_value=0, step=500000)
+            paid_debt = st.number_input("المبلغ المدفوع/المسدد حالياً (د.ع)", min_value=0, step=500000)
+            
+        submit_debt = st.form_submit_button("➕ تسجيل القسط / الدين في السجل")
+        if submit_debt and debtor_name:
+            remaining = total_debt - paid_debt
+            status = "تم السداد" if remaining <= 0 else "متبقي بذمته"
+            new_debt = pd.DataFrame([{
+                "الزبون/المطلوب": debtor_name, "نوع الدين": debt_type, 
+                "المبلغ الكلي (د.ع)": total_debt, "المسدد (د.ع)": paid_debt, 
+                "المتبقي (د.ع)": remaining, "الحالة": status
+            }])
+            st.session_state.diamond_debts = pd.concat([st.session_state.diamond_debts, new_debt], ignore_index=True)
+            st.success(f"✅ تم حفظ دين الزبون ({debtor_name}) بنجاح!")
+
+    st.markdown("---")
+    st.markdown('<h4 class="rtl-text">📋 جدول الديون والأقساط المسجلة</h4>', unsafe_allow_html=True)
+    st.dataframe(st.session_state.diamond_debts, use_container_width=True)
+
+# --- التبويب الرابع: التقارير والبيانات ---
+with tab4:
+    st.markdown('<h3 class="rtl-text">📋 كافة سجلات شركة دايموند</h3>', unsafe_allow_html=True)
+    st.dataframe(st.session_state.diamond_ledger, use_container_width=True)
+    
+    if st.button("🗑️ تصفير وإعادة تعيين كافة الحسابات (مسح الكل)"):
+        st.session_state.diamond_ledger = pd.DataFrame(columns=["التاريخ", "البيان / الوصف", "التصنيف الرئيسي", "نوع الحركة", "المبلغ (د.ع)"])
+        st.session_state.diamond_debts = pd.DataFrame(columns=["الزبون/المطلوب", "نوع الدين", "المبلغ الكلي (د.ع)", "المسدد (د.ع)", "المتبقي (د.ع)", "الحالة"])
+        st.rerun()
+
